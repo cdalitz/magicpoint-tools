@@ -3,12 +3,12 @@
 # latex2eps.sh - translates latex math formula to EPS
 #
 # Expected usage:
-#	%filter "latex2eps.sh eqn"
+#   %filter "latex2eps.sh eqn"
 #   \begin{displaymath}
-#	\frac{1}{x+y}
+#   \frac{1}{x+y}
 #   \end{displaymath}
-#	%endfilter
-#	%image "eqn.eps" 250x200
+#   %endfilter
+#   %image "eqn.eps" 250x200
 #
 # additional style can be used with option -sty, eg.
 #   latex2eps -sty pslatex -sty color eqn
