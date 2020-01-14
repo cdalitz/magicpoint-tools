@@ -63,7 +63,8 @@ situation:
 
     mgpresize -s 0.75 mytalk.mgp > mytalk-800x600.mgp
 
-Please note that this rescaling is unecessary when you use the options "-xscrzoom" or "-yscrzoom".
+Please note that this rescaling is unecessary when you use the options
+"-xscrzoom" or "-yscrzoom".
 
 
 Beautifying postscript output
@@ -90,14 +91,15 @@ Here is how to overcome these limitations:
         { CTL_TFONT, ASCII, "swissbi.ttf",	"Helvetica-BoldOblique" },
           
 
-2. For adding page numbers and footers try the script pspage. Sample usage:
+2. For adding page numbers and footers try the script *pspage*. Sample usage:
 
         mgp2ps -e latin1 infile.mgp | pspage -l -rtext "Presentation Page %p"
           
 
 The script *makeps4mgp* combines the following operations:
 
-- rescales images from 1024x768 (laptop display) to 800x600 (printout size assumed by mgp2ps)
+- rescales images from 1024x768 (laptop display) to 800x600 (printout size
+  assumed by mgp2ps)
 - fixes vertical spacing bug
 - adds page numbers and footer
 - adds margins and optional 4up printing (Option "-4up")
