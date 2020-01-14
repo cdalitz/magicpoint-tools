@@ -1,4 +1,5 @@
 # shell scripts
+* linguist-vendored
 latex2eps linguist-language=Shell
 makeps4mgp linguist-language=Shell
 mgp2pdf linguist-language=Shell
