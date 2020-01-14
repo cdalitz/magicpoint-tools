@@ -1,8 +1,4 @@
 # shell scripts
-* linguist-vendored
-latex2eps linguist-language=Shell
-makeps4mgp linguist-language=Shell
-mgp2pdf linguist-language=Shell
-mgpresize linguist-language=Shell
+* linguist-language=Shell
 pspage linguist-language=Perl
-
+mgp-mode-cd.el linguist-language=emacs-lisp
