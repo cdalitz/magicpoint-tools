@@ -1,0 +1,7 @@
+# shell scripts
+latex2eps linguist-language=Shell
+makeps4mgp linguist-language=Shell
+mgp2pdf linguist-language=Shell
+mgpresize linguist-language=Shell
+pspage linguist-language=Perl
+
