@@ -1,0 +1,91 @@
+#!/bin/sh
+
+#
+# mgpresize - rescales images in MGP file
+#
+# Author/License:
+#   Christoph Dalitz
+#   freely distributable under the terms of the GPL
+#
+# History:
+#   06.10.2003  first creation
+#
+
+# initialization command line options
+INMGP=""
+EPSSCALE=0.75
+PGM="`basename $0`"
+USAGEMSG="Usage:\n\
+\t$PGM [-s factor] mgpfile\n\
+Options:\n\
+\t-s fac  set scale factor to fac\n\
+\t        default value: $EPSSCALE"
+
+# argument loop
+while [ $# -gt 0 ]
+do
+	case "$1" in
+		-\?) echo -e "$USAGEMSG"; exit 0;;
+		-s)  EPSSCALE=$2; shift;;
+		*)   INMGP="$1";;
+	esac
+	shift
+done
+
+# plausi checks
+if [ -z "$INMGP" -o ! -f "$INMGP" ]
+then
+	echo -e "$PGM:\n\tfile $INMGP not found" 1>&2
+	echo -e "$USAGEMSG" 1>&2
+	exit 1
+fi
+if echo "$EPSSCALE" | grep -q '[^0-9.]'
+then
+	echo -e "$PGM:\n\twrong scale factor '-s $EPSSCALE'" 1>&2
+	echo -e "$USAGEMSG" 1>&2
+	exit 1
+fi
+
+# do rescale
+awk '
+BEGIN {}
+# rescale images
+/^%.*image/ {
+	N = split($0, field, " +");
+	for (n=1; n<=N; n++) {
+		if (match(field[n],"newimage")) {
+			printf("%s ", field[n]);
+			# check for scale options -(xy)zoom in next fields
+			while ((n+1<=N) && !match(field[n+1],",")) {
+				++n;
+				printf("%s ", field[n]);
+				if (field[n] == "-zoom") {
+					printf("%d ", field[++n] * epsscale);
+				} else if (field[n] == "-xyzoom") {
+					printf("%d ", field[++n] * epsscale);
+					printf("%d ", field[++n] * epsscale);
+				}
+			}
+			if (n>=N) {printf("\n");}
+		} else if (match(field[n],"image") && (n+5<=N)) {
+			printf("%s ", field[n]);
+			# next fields are: file scaleflag xscale yscale
+			printf("%s ", field[++n]);
+			printf("%s ", field[++n]);
+			printf("%d ", field[++n] * epsscale);
+			printf("%d ", field[++n] * epsscale);
+		} else {
+			if (n<N) {
+				printf("%s ", field[n]);
+			} else {
+				printf("%s\n", field[n]);
+			}
+		}
+	}
+	next;
+}
+# print all other lines unchanged
+{print;}
+END{}
+' epsscale=$EPSSCALE $INMGP
+

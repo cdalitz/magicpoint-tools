@@ -1,0 +1,118 @@
+#!/bin/sh
+#
+# mgp2pdf - translation of MGP to a PDF file suitable for presentations
+#
+# Author/License:
+#   Christoph Dalitz
+#   freely distributable under the terms of the GPL
+#
+# Requirements:
+#   mgp2ps (>=1.11a), ps2pdf
+#
+# History:
+#   22.09.2004  first creation
+#
+
+# constant variables
+TMPMGP=v4ps.mgp
+EPSSCALE=1.0
+
+# initialization command line options
+INMGP=""
+PAPER="a4"
+USAGEMSG="Usage:\n\
+\t`basename $0` [options] <mgpfile>\n\
+Options:\n\
+\t-paper <format>
+\t       sets papersize; possible values for <format>:\n\
+\t       \"a4\" (default), \"letter\"\n\
+\t-scale <factor>
+\t       rescale images by <factor>, eg. 0.75 for 1024x768 -> 800x600\n\
+\t       (only necessary when using -zoom rather than -scrzoom somewhere)"
+
+
+# parse command line
+while [ $# -gt 0 ]
+do
+	case "$1" in
+		-paper)  PAPER="$2"; shift;;
+		-scale)  EPSSCALE="$2"; shift;;
+		-*)      echo -e "$USAGEMSG" 1>&2; exit 1;;
+		*)       INMGP=$1;;
+	esac
+	shift
+done
+if [ -z "$INMGP" -o ! -e "$INMGP" -o -z "$PAPER" -o -z "$EPSSCALE" ]
+then
+	echo -e "$USAGEMSG" 1>&2
+	exit 1
+fi
+
+# set file names
+OUTPS=`basename $INMGP .mgp`.ps
+OUTPDF=`basename $INMGP .mgp`.pdf
+echo "$INMGP -> $OUTPDF ..."
+
+# rescale images if wished
+if [ "$EPSSCALE" != "1.0" ]
+then
+    echo "rescale (factor $EPSSCALE)"
+    awk '
+# rescale images
+/^%.*image/ {
+	if (noprint>0) {
+		next;
+	}
+	N = split($0, field, " +");
+	for (n=1; n<=N; n++) {
+		if (match(field[n],"newimage")) {
+			printf("%s ", field[n]);
+			# check for scale options -(xy)zoom in next fields
+			while ((n+1<=N) && !match(field[n+1],",")) {
+				++n;
+				printf("%s ", field[n]);
+				if (field[n] == "-zoom") {
+					printf("%d ", field[++n] * epsscale);
+				} else if (field[n] == "-xyzoom") {
+					printf("%d ", field[++n] * epsscale);
+					printf("%d ", field[++n] * epsscale);
+				}
+			}
+			if (n>=N) {printf("\n");}
+		} else if (match(field[n],"image") && (n+5<=N)) {
+			printf("%s ", field[n]);
+			# next fields are: file scaleflag xscale yscale
+			printf("%s ", field[++n]);
+			printf("%s ", field[++n]);
+			printf("%d ", field[++n] * epsscale);
+			printf("%d ", field[++n] * epsscale);
+		} else {
+			if (n<N) {
+				printf("%s ", field[n]);
+			} else {
+				printf("%s\n", field[n]);
+			}
+		}
+	}
+	next;
+}
+# print all other lines unchanged
+{
+	if (noprint==0) {
+		print;
+	}
+}
+END{}
+' epsscale=$EPSSCALE $INMGP > $TMPMGP
+else
+    ln -s $INMGP $TMPMGP
+fi
+
+# convert to PDF
+mgp2ps -c -p $PAPER -e latin1 -m $TMPMGP > $OUTPS
+ps2pdf -sPAPERSIZE=$PAPER $OUTPS $OUTPDF
+
+# clean up
+rm $OUTPS
+rm $TMPMGP
+

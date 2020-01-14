@@ -1,0 +1,207 @@
+#!/bin/sh
+#
+# makeps4mgp - translation of MGP to PS with mgp2ps and psnup
+#
+# Author/License:
+#   Christoph Dalitz
+#   freely distributable under the terms of the GPL v2
+#
+# Requirements:
+#   mgp2ps, psnup, pspage, [ ps2pdf (for PDF output) ]
+#
+# History:
+#   14.05.2002  first creation
+#   07.11.2002  added noprint-sections and -pdf option
+#               new options -paper and -2up (thanks to Alvaro Herrera)
+#   26.03.2003  new option -color for colored output
+#   02.07.2003  new option -footer
+#               Infile basename initcap'd for default footer text
+#   15.10.2003  Correction in footer handling
+#   05.03.2004  Workaround for Postscript bug in HP LaserJet 1200
+#   23.07.2004  new option -multi
+#
+# Outline:
+#   a) strip %%begin noprint ... %%end noprint
+#   b) rescale EPS-Images
+#   c) translate to PS with mgp2ps
+#   d) add margin with psnup
+#   e) add page numbers and footer with pspage
+#   f) optionally convert to PDF with ps2pdf
+#
+
+# constant variables
+TMPMGP=v4ps.mgp
+EPSSCALE=0.75
+
+# initialization command line options
+INMGP=""
+NUP=1
+PAPER="a4"
+PDF=0
+MULTI=0
+ALL=0
+COLOR=""
+FOOTER=""
+USAGEMSG="Usage:\n\
+\t`basename $0` [options] <mgpfile>\n\
+Options:\n\
+\t-4up   four slides on one page\n\
+\t-2up   two slides on one page\n\
+\t-pdf   convert to PDF instead of PS\n\
+\t-multi create multi page output for %pause emulation\n\
+\t       (for presentations and without border and footer)\n\
+\t-paper <format>
+\t       sets papersize; possible values for <format>:\n\
+\t       \"a4\" (default), \"letter\"\n\
+\t-color create color PS\n\
+\t-footer <text>
+\t       sets page footer text to <text>\n\
+\t       default value: input file name\n\
+\t-all   print entire file (otherwise\n\
+\t       %%begin noprint ... %%end noprint\n\
+\t       sections are omitted)"
+
+
+# parse command line
+while [ $# -gt 0 ]
+do
+	case "$1" in
+		-4up)    NUP=4;;
+		-2up)    NUP=2;;
+		-paper)  PAPER="$2"; shift;;
+		-pdf)    PDF=1;;
+		-multi)  MULTI=1;;
+		-color)  COLOR="-c";;
+		-footer) FOOTER="$2"; shift;;
+		-all)    ALL=1;;
+		-*)      echo -e "$USAGEMSG" 1>&2; exit 1;;
+		*)       INMGP=$1;;
+	esac
+	shift
+done
+if [ -z "$INMGP" -o ! -e "$INMGP" -o -z "$PAPER" ]
+then
+	echo -e "$USAGEMSG" 1>&2
+	exit 1
+fi
+
+if [ -z "$FOOTER" ]
+then
+	# first letter in file basename capitalized for footer
+	FOOTER="`basename $INMGP .mgp | cut -b 1 | tr 'a-z' 'A-Z'`"
+	FOOTER="${FOOTER}`basename $INMGP .mgp | cut -b 2-`"
+fi
+
+# outfile name
+if [ $NUP -gt 1 ]
+then
+    OUTPS=`basename $INMGP .mgp`-${NUP}up.ps
+    OUTPDF=`basename $INMGP .mgp`-${NUP}up.pdf
+else
+    OUTPS=`basename $INMGP .mgp`.ps
+    OUTPDF=`basename $INMGP .mgp`.pdf
+fi
+if [ $PDF = 0 ]
+then
+	echo "$INMGP -> $OUTPS ..."
+else
+	OUTPS=tmp-$OUTPS
+	echo "$INMGP -> $OUTPDF ..."
+fi
+
+# take care of papersize option for placemant of footer text
+PSPAGEPOS=""
+if [ $PAPER = "letter" ]
+then
+	PSPAGEPOS="-y 26.8 -x 20.8"
+fi
+
+# remove "noprint" sections
+# rescale images from 1024x768 to 800x600
+awk '
+BEGIN {
+	noprint = 0;
+}
+# remove noprint sections
+/^%%begin noprint/ && (!printall) {
+	noprint++;
+	next;
+}
+/^%%end noprint/ && (!printall) {
+	if (noprint>0) {noprint--;}
+	next;
+}
+# rescale images
+/^%.*image/ {
+	if (noprint>0) {
+		next;
+	}
+	N = split($0, field, " +");
+	for (n=1; n<=N; n++) {
+		if (match(field[n],"newimage")) {
+			printf("%s ", field[n]);
+			# check for scale options -(xy)zoom in next fields
+			while ((n+1<=N) && !match(field[n+1],",")) {
+				++n;
+				printf("%s ", field[n]);
+				if (field[n] == "-zoom") {
+					printf("%d ", field[++n] * epsscale);
+				} else if (field[n] == "-xyzoom") {
+					printf("%d ", field[++n] * epsscale);
+					printf("%d ", field[++n] * epsscale);
+				}
+			}
+			if (n>=N) {printf("\n");}
+		} else if (match(field[n],"image") && (n+5<=N)) {
+			printf("%s ", field[n]);
+			# next fields are: file scaleflag xscale yscale
+			printf("%s ", field[++n]);
+			printf("%s ", field[++n]);
+			printf("%d ", field[++n] * epsscale);
+			printf("%d ", field[++n] * epsscale);
+		} else {
+			if (n<N) {
+				printf("%s ", field[n]);
+			} else {
+				printf("%s\n", field[n]);
+			}
+		}
+	}
+	next;
+}
+# print all other lines unchanged
+{
+	if (noprint==0) {
+		print;
+	}
+}
+END{}
+' epsscale=$EPSSCALE printall=$ALL $INMGP > $TMPMGP
+
+# convert to PS
+if [ $MULTI = 1 ]
+then
+	mgp2ps -m -x 0 -y 0 $COLOR -p $PAPER -e latin1 $TMPMGP > $OUTPS
+elif [ $NUP -gt 1 ]
+then
+	mgp2ps $COLOR -p $PAPER -e latin1 $TMPMGP | \
+		pspage $PSPAGEPOS -l -font NewCenturySchlbk-Roman:22 | \
+		psnup -p$PAPER -l -${NUP} -c -b0.7cm -m35 | \
+		pspage $PSPAGEPOS -l -font Times-Italic:10 -rtext "$FOOTER" \
+		> $OUTPS
+else
+	mgp2ps $COLOR -p $PAPER -e latin1 $TMPMGP | \
+		psnup -p$PAPER -1 -m55 | \
+		pspage $PSPAGEPOS -l -font Times-Italic:12 -rtext "$FOOTER - %p" \
+		> $OUTPS
+fi
+
+# convert to PDF
+if [ $PDF = 1 ]
+then
+	ps2pdf -sPAPERSIZE=a4 $OUTPS $OUTPDF
+	rm $OUTPS
+fi
+
+rm $TMPMGP
+
