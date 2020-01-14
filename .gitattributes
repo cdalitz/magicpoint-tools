@@ -1,4 +1,5 @@
-# shell scripts
+# most files are bourne shell scripts
 * linguist-language=Shell
+*.* linguist-language=Shell
 pspage linguist-language=Perl
 mgp-mode-cd.el linguist-language=emacs-lisp
